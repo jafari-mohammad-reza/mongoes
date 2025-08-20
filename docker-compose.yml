@@ -1,0 +1,8 @@
+version: "3.8"
+services:
+  mongo3:
+    image: mongo:3.6.8
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo3-data:/var/lib/mongodb

@@ -56,7 +56,11 @@ func TestMdClient(t *testing.T) {
 		}
 	}()
 
-	if err := md.WatchColl(ctx, "test-db", "users"); err != nil {
+	_, errChan, err := md.WatchColl(ctx, "test-db", "users", 100)
+	if err != nil {
+		t.Fatalf("failed watching coll %s\n", err.Error())
+	}
+	for err := range errChan {
 		t.Fatalf("failed watching coll %s\n", err.Error())
 	}
 

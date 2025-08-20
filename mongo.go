@@ -48,8 +48,11 @@ func (m *MdClient) Destroy(ctx context.Context) error {
 	return m.cl.Disconnect(ctx)
 }
 
-func (m *MdClient) WatchColl(ctx context.Context, db, coll string) error {
+func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) (chan []string, chan error, error) {
 	var stat CollStats
+	processedChan := make(chan []string, 10)
+	errorChan := make(chan error, 1)
+
 	collStat, ok := m.collStat[coll]
 	if !ok {
 		stat = CollStats{
@@ -60,42 +63,56 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll string) error {
 		stat = collStat
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println("watch coll ctx done")
-			return nil
-		default:
-		}
+	go func() {
+		defer close(processedChan)
+		defer close(errorChan)
 
-		cur, err := m.cl.Database(db).Collection(coll).Find(ctx, bson.D{}, &options.FindOptions{Skip: &stat.Offset})
-		if err != nil {
-			return fmt.Errorf("failed to skip %d items from %s in %s database: %s", stat.Offset, coll, db, err.Error())
-		}
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("watch coll ctx done")
+				return
+			default:
+			}
 
-		processed := []string{}
-		for cur.Next(ctx) {
-			item := cur.Current.String()
-			processed = append(processed, item)
-		}
-		cur.Close(ctx)
+			cur, err := m.cl.Database(db).Collection(coll).Find(ctx, bson.D{}, &options.FindOptions{Skip: &stat.Offset, Limit: &batch})
+			if err != nil {
+				errorChan <- fmt.Errorf("failed to skip %d items from %s in %s database: %s", stat.Offset, coll, db, err.Error())
+				return
+			}
 
-		stat.Offset += int64(len(processed))
+			processed := []string{}
+			for cur.Next(ctx) {
+				item := cur.Current.String()
+				processed = append(processed, item)
+			}
+			cur.Close(ctx)
 
-		m.collStat[coll] = stat
+			stat.Offset += int64(len(processed))
+			m.collStat[coll] = stat
 
-		if len(processed) > 0 {
-			if err := m.logProcessed(coll, processed); err != nil {
-				return err
+			if len(processed) > 0 {
+				if err := m.logProcessed(coll, processed); err != nil {
+					errorChan <- err
+					return
+				}
+
+				select {
+				case processedChan <- processed:
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			if len(processed) == 0 {
+				time.Sleep(5 * time.Second)
+			} else {
+				time.Sleep(time.Second)
 			}
 		}
+	}()
 
-		if len(processed) == 0 {
-			time.Sleep(5 * time.Second)
-		} else {
-			time.Sleep(time.Second)
-		}
-	}
+	return processedChan, errorChan, nil
 }
 
 func (m *MdClient) logProcessed(coll string, processed []string) error {

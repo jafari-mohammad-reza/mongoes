@@ -3,6 +3,7 @@ package md
 import (
 	"context"
 	"fmt"
+	"mongo-es/utils"
 	"os"
 	"time"
 
@@ -25,7 +26,7 @@ func TestMdClient(t *testing.T) {
 	md := NewMdClient()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	prepare()
+	utils.Prepare()
 	defer func() {
 		os.RemoveAll("es-processed")
 		os.RemoveAll("md-processed")

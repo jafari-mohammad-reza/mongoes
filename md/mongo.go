@@ -51,9 +51,9 @@ func (m *MdClient) Destroy(ctx context.Context) error {
 func (m *MdClient) Colls(ctx context.Context, db string) ([]string, error) {
 	return m.cl.Database(db).ListCollectionNames(ctx, bson.D{})
 }
-func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) (chan []string, chan error, error) {
+func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) (chan []bson.Raw, chan error, error) {
 	var stat CollStats
-	processedChan := make(chan []string, 10)
+	processedChan := make(chan []bson.Raw, 10)
 	errorChan := make(chan error, 1)
 
 	collStat, ok := m.collStat[coll]
@@ -84,9 +84,9 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) 
 				return
 			}
 
-			processed := []string{}
+			processed := []bson.Raw{}
 			for cur.Next(ctx) {
-				item := cur.Current.String()
+				item := cur.Current
 				processed = append(processed, item)
 			}
 			cur.Close(ctx)
@@ -118,7 +118,7 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) 
 	return processedChan, errorChan, nil
 }
 
-func (m *MdClient) logProcessed(coll string, processed []string) error {
+func (m *MdClient) logProcessed(coll string, processed []bson.Raw) error {
 	file, ok := m.processFiles[coll]
 	if !ok {
 		f, err := os.OpenFile(path.Join("md-processed", fmt.Sprintf("%s_processed.log", coll)), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0655)
@@ -129,7 +129,7 @@ func (m *MdClient) logProcessed(coll string, processed []string) error {
 		m.processFiles[coll] = f
 	}
 	for i, pr := range processed {
-		_, err := fmt.Fprintln(file, pr)
+		_, err := fmt.Fprintln(file, pr.String())
 		if err != nil {
 			return fmt.Errorf("failed to write processed line %d to process file: %s", i, err.Error())
 		}

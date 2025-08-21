@@ -55,7 +55,7 @@ func main() {
 				if !ok {
 					prefix = coll
 				}
-				if err := esc.IndexProcessed(processed, prefix); err != nil {
+				if err := esc.IndexProcessed(ctx, processed, prefix); err != nil {
 					errCh <- err
 				}
 			case err := <-errCh:

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "Building with vendored dependencies..."
+rm -rf *-processed *-data vendor
 
 # Vendor dependencies first
 go mod vendor
@@ -49,6 +50,4 @@ go build -mod=vendor \
     -o mongoes 
 # Clean up
 rm -rf vendor/
-
 echo "Built: $(du -h mongoes | cut -f1)"
-ldd mongoes 2>&1 || file mongoes

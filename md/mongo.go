@@ -1,11 +1,13 @@
 package md
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"mongo-es/utils"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -42,6 +44,38 @@ func (m *MdClient) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to connect to mongo %s", uri)
 	}
 	m.cl = md
+	if err := m.loadOffsets(ctx); err != nil {
+		return fmt.Errorf("failed to load offsets: %s", err.Error())
+	}
+	return nil
+}
+
+func (m *MdClient) loadOffsets(ctx context.Context) error {
+	logDir, err := os.ReadDir("md-processed")
+	if err != nil {
+		return fmt.Errorf("failed to read md-processed dir %s", err.Error())
+	}
+	for _, entry := range logDir {
+		f, err := os.OpenFile(path.Join("md-processed", entry.Name()), os.O_RDONLY, 0655)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %s", entry.Name(), err.Error())
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		lineCount := 0
+
+		for scanner.Scan() {
+			lineCount++
+		}
+
+		if err := scanner.Err(); err != nil {
+			return fmt.Errorf("scanner error: %v", err)
+		}
+		collName := strings.Split(entry.Name(), "_processed.log")[0]
+		m.collStat[collName] = CollStats{
+			Offset: int64(lineCount),
+		}
+	}
 	return nil
 }
 
@@ -51,7 +85,10 @@ func (m *MdClient) Destroy(ctx context.Context) error {
 func (m *MdClient) Colls(ctx context.Context, db string) ([]string, error) {
 	return m.cl.Database(db).ListCollectionNames(ctx, bson.D{})
 }
-func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) (chan []bson.Raw, chan error, error) {
+func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch int64) (chan []bson.Raw, chan error, error) {
+	if sortBy == "" {
+		sortBy = "created_at"
+	}
 	var stat CollStats
 	processedChan := make(chan []bson.Raw, 10)
 	errorChan := make(chan error, 1)
@@ -77,7 +114,7 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) 
 			default:
 			}
 
-			cur, err := m.cl.Database(db).Collection(coll).Find(ctx, bson.D{}, &options.FindOptions{Skip: &stat.Offset, Limit: &batch})
+			cur, err := m.cl.Database(db).Collection(coll).Find(ctx, bson.D{}, &options.FindOptions{Sort: bson.M{sortBy: -1}, Skip: &stat.Offset, Limit: &batch})
 			if err != nil {
 				errorChan <- fmt.Errorf("failed to skip %d items from %s in %s database: %s", stat.Offset, coll, db, err.Error())
 				return

@@ -20,6 +20,7 @@ type TestRecord struct {
 	Stats    struct {
 		Country string `bson:"country"`
 	} `bson:"stats"` // we add nested field to be able to work on collections with variation of structures
+	CreatedAt time.Time `bson:"created_at"`
 }
 
 func TestMdClient(t *testing.T) {
@@ -49,12 +50,14 @@ func TestMdClient(t *testing.T) {
 		}
 	}()
 
-	_, errChan, err := md.WatchColl(ctx, "test-db", "users", 100)
+	_, errChan, err := md.WatchColl(ctx, "test-db", "users", "", 100)
 	if err != nil {
 		t.Fatalf("failed watching coll %s\n", err.Error())
+		coll.Drop(ctx)
 	}
 	for err := range errChan {
 		t.Fatalf("failed watching coll %s\n", err.Error())
+		coll.Drop(ctx)
 	}
 
 }
@@ -96,6 +99,7 @@ func generateTestRecord(ctx context.Context, count int) ([]any, error) {
 			}{
 				Country: gofakeit.Country(),
 			},
+			CreatedAt: time.Now(),
 		}
 		records = append(records, rec)
 	}

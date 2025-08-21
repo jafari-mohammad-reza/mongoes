@@ -65,7 +65,6 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) 
 	} else {
 		stat = collStat
 	}
-
 	go func() {
 		defer close(processedChan)
 		defer close(errorChan)
@@ -92,17 +91,12 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll string, batch int64) 
 			cur.Close(ctx)
 
 			stat.Offset += int64(len(processed))
+			processedChan <- processed
 			m.collStat[coll] = stat
 
 			if len(processed) > 0 {
 				if err := m.logProcessed(coll, processed); err != nil {
 					errorChan <- err
-					return
-				}
-
-				select {
-				case processedChan <- processed:
-				case <-ctx.Done():
 					return
 				}
 			}

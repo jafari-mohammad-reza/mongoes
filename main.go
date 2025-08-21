@@ -8,9 +8,12 @@ import (
 	"mongo-es/utils"
 	"os"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	godotenv.Load()
 	ctx := context.Background()
 	utils.Prepare()
 	mc := md.NewMdClient()
@@ -49,19 +52,20 @@ func main() {
 				fmt.Printf("failed to get %s changes: %s", coll, err.Error())
 				os.Exit(1)
 			}
-			select {
-			case processed := <-prCh:
-				prefix, ok := esColl[coll]
-				if !ok {
-					prefix = coll
+			for {
+				select {
+				case processed := <-prCh:
+					prefix, ok := esColl[coll]
+					if !ok {
+						prefix = coll
+					}
+					if err := esc.IndexProcessed(ctx, processed, prefix); err != nil {
+						errCh <- err
+					}
+				case err := <-errCh:
+					fmt.Printf("failed to get %s changes: %s", coll, err.Error())
+					os.Exit(1)
 				}
-				if err := esc.IndexProcessed(ctx, processed, prefix); err != nil {
-					errCh <- err
-				}
-			case err := <-errCh:
-				fmt.Printf("failed to get %s changes: %s", coll, err.Error())
-				os.Exit(1)
-			default:
 			}
 		}()
 	}

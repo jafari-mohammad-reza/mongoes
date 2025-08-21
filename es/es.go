@@ -14,6 +14,7 @@ import (
 
 	elastic "github.com/elastic/go-elasticsearch/v8"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type EsClient struct {
@@ -27,7 +28,7 @@ func NewEsClient() *EsClient {
 func (es *EsClient) Init() error {
 	cfg := elastic.Config{
 		Addresses: []string{
-			utils.Env("ELASTIC_ADDR", "http://localhost:9092"),
+			utils.Env("ELASTIC_ADDR", "http://localhost:9200"),
 		},
 		Username: utils.Env("ELASTIC_USER", ""),
 		Password: utils.Env("ELASTIC_PASSWORD", ""),
@@ -47,16 +48,30 @@ func (es *EsClient) Init() error {
 }
 func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, prefix string) error {
 	index := fmt.Sprintf("%s-%s", prefix, time.Now().Format(time.DateOnly))
-
 	var buf bytes.Buffer
 
-	for i, pr := range processed {
-		var doc map[string]interface{}
+	for _, pr := range processed {
+		var doc map[string]any
 		if err := bson.Unmarshal(pr, &doc); err != nil {
 			return fmt.Errorf("failed to unmarshal bson: %w", err)
 		}
+		idVal, ok := doc["_id"]
+		if !ok {
+			return fmt.Errorf("document missing _id")
+		}
+		var docID string
+		switch v := idVal.(type) {
+		case primitive.ObjectID:
+			docID = v.Hex()
+		default:
+			docID = fmt.Sprintf("%v", v)
+		}
+		delete(doc, "_id")
 
-		meta := fmt.Appendf(nil, `{ "index" : { "_index" : "%s", "_id" : "%d" } }%s`, index, i, "\n")
+		meta := fmt.Appendf(nil,
+			`{ "index" : { "_index" : "%s", "_id" : "%s" } }%s`,
+			index, docID, "\n",
+		)
 		data, err := json.Marshal(doc)
 		if err != nil {
 			return fmt.Errorf("failed to marshal json: %w", err)
@@ -67,11 +82,23 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, pr
 		buf.Write(meta)
 		buf.Write(data)
 	}
-
 	res, err := es.client.Bulk(
 		strings.NewReader(buf.String()),
 		es.client.Bulk.WithContext(ctx),
 	)
+	var bulkRes map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&bulkRes); err != nil {
+		return fmt.Errorf("decode bulk response: %w", err)
+	}
+	if bulkRes["errors"].(bool) {
+		for _, item := range bulkRes["items"].([]any) {
+			it := item.(map[string]any)
+			idx := it["index"].(map[string]any)
+			if idx["error"] != nil {
+				return fmt.Errorf("failed doc %v: %+v\n", idx["_id"], idx["error"])
+			}
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("bulk request failed: %w", err)
 	}

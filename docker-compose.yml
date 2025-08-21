@@ -1,8 +1,22 @@
 version: "3.8"
 services:
   mongo3:
-    image: mongo:3.6.8
+    image: mongo
     ports:
       - "27017:27017"
     volumes:
       - ./mongo3-data:/var/lib/mongodb
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: es01
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+volumes:
+  es_data:

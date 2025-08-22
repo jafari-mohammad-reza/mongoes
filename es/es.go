@@ -57,7 +57,6 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, pr
 		}
 		index := i[0]
 		if index == prefix {
-
 		}
 		field := i[1]
 		if field != "" {
@@ -85,12 +84,14 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, pr
 			docID = fmt.Sprintf("%v", v)
 		}
 		delete(doc, "_id")
+		flat := make(map[string]any)
+		flattenMap(doc, "", flat)
 
 		meta := fmt.Appendf(nil,
 			`{ "index" : { "_index" : "%s", "_id" : "%s" } }%s`,
 			index, docID, "\n",
 		)
-		data, err := json.Marshal(doc)
+		data, err := json.Marshal(flat)
 		if err != nil {
 			return fmt.Errorf("failed to marshal json: %w", err)
 		}
@@ -128,4 +129,28 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, pr
 
 	log.Printf("Indexed %d docs into %s", len(processed), index)
 	return nil
+}
+
+func flattenMap(m map[string]any, prefix string, out map[string]any) {
+	for k, v := range m {
+		key := k
+
+		switch val := v.(type) {
+		case map[string]any:
+			flattenMap(val, key, out)
+		case bson.M:
+			flattenMap(val, key, out)
+		case []any:
+			for i, arrVal := range val {
+				arrKey := fmt.Sprintf("%s_%d", key, i)
+				if subMap, ok := arrVal.(map[string]any); ok {
+					flattenMap(subMap, arrKey, out)
+				} else {
+					out[arrKey] = arrVal
+				}
+			}
+		default:
+			out[key] = v
+		}
+	}
 }

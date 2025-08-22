@@ -48,6 +48,23 @@ func (es *EsClient) Init() error {
 }
 func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, prefix string) error {
 	index := fmt.Sprintf("%s-%s", prefix, time.Now().Format(time.DateOnly))
+	uniqueField := "_id"
+	unFieldsEnv := utils.Env("PREFIX_UNIQUES", "")
+	for item := range strings.SplitSeq(unFieldsEnv, ",") {
+		i := strings.Split(item, ":")
+		if len(i) != 2 {
+			continue
+		}
+		index := i[0]
+		if index == prefix {
+
+		}
+		field := i[1]
+		if field != "" {
+			uniqueField = field
+		}
+	}
+
 	var buf bytes.Buffer
 
 	for _, pr := range processed {
@@ -55,10 +72,11 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, pr
 		if err := bson.Unmarshal(pr, &doc); err != nil {
 			return fmt.Errorf("failed to unmarshal bson: %w", err)
 		}
-		idVal, ok := doc["_id"]
+		idVal, ok := doc[uniqueField]
 		if !ok {
-			return fmt.Errorf("document missing _id")
+			return fmt.Errorf("document missing unique field %q", uniqueField)
 		}
+
 		var docID string
 		switch v := idVal.(type) {
 		case primitive.ObjectID:

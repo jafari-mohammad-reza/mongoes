@@ -1,0 +1,7 @@
+{
+    "name":"firstName",
+    "last_name": "lastName",
+    "stats":{
+        "country":"user_country"
+    }
+}

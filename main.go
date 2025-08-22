@@ -44,7 +44,11 @@ func main() {
 			esColl[pair[0]] = pair[1]
 		}
 	}
-
+	mapper, err := utils.NewMapper()
+	if err != nil {
+		fmt.Printf("failed to create mapper: %s\n", err.Error())
+		os.Exit(1)
+	}
 	for _, coll := range colls {
 		go func() {
 			prCh, errCh, err := mc.WatchColl(ctx, db, coll, "", 500)
@@ -59,7 +63,11 @@ func main() {
 					if !ok {
 						prefix = coll
 					}
-					if err := esc.IndexProcessed(ctx, processed, prefix); err != nil {
+					processedMap, err := mapper.ProcessedMapper(coll, processed)
+					if err != nil {
+						errCh <- err
+					}
+					if err := esc.IndexProcessed(ctx, processedMap, prefix); err != nil {
 						errCh <- err
 					}
 				case err := <-errCh:

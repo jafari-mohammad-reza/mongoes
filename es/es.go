@@ -13,8 +13,6 @@ import (
 	"time"
 
 	elastic "github.com/elastic/go-elasticsearch/v8"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type EsClient struct {
@@ -46,7 +44,7 @@ func (es *EsClient) Init() error {
 	es.client = client
 	return nil
 }
-func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, prefix string) error {
+func (es *EsClient) IndexProcessed(ctx context.Context, processed []map[string]any, prefix string) error {
 	index := fmt.Sprintf("%s-%s", prefix, time.Now().Format(time.DateOnly))
 	uniqueField := "_id"
 	unFieldsEnv := utils.Env("PREFIX_UNIQUES", "")
@@ -66,32 +64,18 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, pr
 
 	var buf bytes.Buffer
 
-	for _, pr := range processed {
-		var doc map[string]any
-		if err := bson.Unmarshal(pr, &doc); err != nil {
-			return fmt.Errorf("failed to unmarshal bson: %w", err)
-		}
+	for _, doc := range processed {
 		idVal, ok := doc[uniqueField]
 		if !ok {
 			return fmt.Errorf("document missing unique field %q", uniqueField)
 		}
 
-		var docID string
-		switch v := idVal.(type) {
-		case primitive.ObjectID:
-			docID = v.Hex()
-		default:
-			docID = fmt.Sprintf("%v", v)
-		}
 		delete(doc, "_id")
-		flat := make(map[string]any)
-		flattenMap(doc, "", flat)
-
 		meta := fmt.Appendf(nil,
 			`{ "index" : { "_index" : "%s", "_id" : "%s" } }%s`,
-			index, docID, "\n",
+			index, idVal, "\n",
 		)
-		data, err := json.Marshal(flat)
+		data, err := json.Marshal(doc)
 		if err != nil {
 			return fmt.Errorf("failed to marshal json: %w", err)
 		}
@@ -129,28 +113,4 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []bson.Raw, pr
 
 	log.Printf("Indexed %d docs into %s", len(processed), index)
 	return nil
-}
-
-func flattenMap(m map[string]any, prefix string, out map[string]any) {
-	for k, v := range m {
-		key := k
-
-		switch val := v.(type) {
-		case map[string]any:
-			flattenMap(val, key, out)
-		case bson.M:
-			flattenMap(val, key, out)
-		case []any:
-			for i, arrVal := range val {
-				arrKey := fmt.Sprintf("%s_%d", key, i)
-				if subMap, ok := arrVal.(map[string]any); ok {
-					flattenMap(subMap, arrKey, out)
-				} else {
-					out[arrKey] = arrVal
-				}
-			}
-		default:
-			out[key] = v
-		}
-	}
 }

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -16,21 +15,17 @@ func TestBulkInsert(t *testing.T) {
 		t.Fatalf("failed to init es: %v", err)
 	}
 
-	var docs []bson.Raw
+	var docs []map[string]any
 	for i := 0; i < 5; i++ {
 		id := primitive.NewObjectID()
-		doc := bson.M{
-			"_id":    id,
+		doc := map[string]any{
+			"_id":    id.String(),
 			"user":   "user_" + id.Hex()[0:6],
 			"count":  i,
 			"ts":     time.Now(),
 			"active": true,
 		}
-		raw, err := bson.Marshal(doc)
-		if err != nil {
-			t.Fatalf("failed to marshal doc: %v", err)
-		}
-		docs = append(docs, raw)
+		docs = append(docs, doc)
 	}
 
 	if err := es.IndexProcessed(context.Background(), docs, "test-index"); err != nil {

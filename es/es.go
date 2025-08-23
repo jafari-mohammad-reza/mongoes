@@ -9,6 +9,7 @@ import (
 	"log"
 	"mongo-es/utils"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,7 +46,11 @@ func (es *EsClient) Init() error {
 	return nil
 }
 func (es *EsClient) IndexProcessed(ctx context.Context, processed []map[string]any, prefix string) error {
-	index := fmt.Sprintf("%s-%s", prefix, time.Now().Format(time.DateOnly))
+	suffix := utils.Env("INDIC_INDEXING_PERIOD", "fixed")
+	index := fmt.Sprintf("%s-%s", prefix, suffix)
+	if conv, err := strconv.Atoi(suffix); err == nil {
+		index = fmt.Sprintf("%s-%s", prefix, time.Now().Add(time.Duration(time.Hour*time.Duration(conv))).Format(time.DateOnly))
+	}
 	uniqueField := "_id"
 	unFieldsEnv := utils.Env("PREFIX_UNIQUES", "")
 	for item := range strings.SplitSeq(unFieldsEnv, ",") {

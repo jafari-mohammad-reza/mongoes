@@ -64,7 +64,7 @@ func main() {
 			prCh, errCh, err := mc.WatchColl(ctx, db, coll, "", 500)
 			if err != nil {
 				fmt.Printf("failed to get %s changes: %s", coll, err.Error())
-				os.Exit(1)
+				return
 			}
 			for {
 				select {

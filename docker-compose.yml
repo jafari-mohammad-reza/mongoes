@@ -1,11 +1,13 @@
 version: "3.8"
+
 services:
   mongo3:
     image: mongo:latest
     ports:
       - "27017:27017"
     volumes:
-      - ./mongo3-data:/var/lib/mongodb
+      - ./mongo3-data:/data/db
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: es01
@@ -17,6 +19,22 @@ services:
       - "9200:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
 
 volumes:
   es_data:

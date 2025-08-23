@@ -115,7 +115,6 @@ func (m *Mapper) EsMapper(indic string, processed []map[string]any) ([]map[strin
 				ind := parts[0]
 				field := parts[1]
 				if ind == indic {
-					fmt.Printf("field: %v\n", field)
 					field = strings.ReplaceAll(field, "\"", "")
 					flatmap, ok := toMapSliceLoose(flattened[field])
 					if !ok {

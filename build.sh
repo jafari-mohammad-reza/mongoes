@@ -1,7 +1,6 @@
 #!/bin/bash
 
 echo "Building with vendored dependencies..."
-rm -rf *-processed *-data vendor
 
 # Vendor dependencies first
 go mod vendor

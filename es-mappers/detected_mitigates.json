@@ -14,6 +14,7 @@
   "pps_sum": "pps_sum",
   "lrl_sum": "lrl_sum",
   "message.Destination IP": "dest_ip",
+  "message.Type of Attack Destination IP Addresses": "dest_ip_type",
   "dont_touch_me": "dont_touch_me",
   "end_time": "end_time",
   "first_hit": "first_hit",
@@ -22,5 +23,12 @@
   "message.protocol": "protocol",
   "start_time": "start_time",
   "message.type": "type",
-  "updatedAt": "updatedAt"
+  "updatedAt": "updatedAt",
+  "message.dest_mask": "dest_mask",
+  "message.Distinct Count of Destination Ports Number Used as Attack Targets": "dest_port_count",
+  "message.Type of Attack Destination Ports Number": "dest_port_type",
+  "message.Distinct Count of Source IP Addresses Used in the Attack": "src_ip_count",
+  "Type of Attack Source IP Addresses": "src_ip_type",
+  "Distinct Count of Source Ports Number Used in the Attack": "src_port_count",
+  "Type of Attack Source Ports Number": "src_port_type"
 }

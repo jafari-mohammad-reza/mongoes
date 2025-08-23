@@ -7,6 +7,7 @@ import (
 	"mongo-es/md"
 	"mongo-es/utils"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -49,7 +50,16 @@ func main() {
 		fmt.Printf("failed to create mapper: %s\n", err.Error())
 		os.Exit(1)
 	}
+	selectedColls := utils.Env("SELECTED_COLLS", "*")
+	whiteListedColls := []string{}
+	if selectedColls != "*" {
+		whiteListedColls = strings.Split(selectedColls, ",")
+	}
 	for _, coll := range colls {
+		if len(whiteListedColls) > 0 && !slices.Contains(whiteListedColls, coll) {
+			fmt.Printf("ignoring %s as its not white listed\n", coll)
+			continue
+		}
 		go func() {
 			prCh, errCh, err := mc.WatchColl(ctx, db, coll, "", 500)
 			if err != nil {

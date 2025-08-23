@@ -63,7 +63,6 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []map[string]a
 	}
 
 	var buf bytes.Buffer
-
 	for _, doc := range processed {
 		idVal, ok := doc[uniqueField]
 		if !ok {

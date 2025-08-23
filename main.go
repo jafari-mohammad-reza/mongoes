@@ -81,7 +81,11 @@ func main() {
 					if err != nil {
 						errCh <- err
 					}
-					if err := esc.IndexProcessed(ctx, processedMap, prefix); err != nil {
+					esProcessedMap, err := mapper.EsMapper(prefix, processedMap)
+					if err != nil {
+						errCh <- err
+					}
+					if err := esc.IndexProcessed(ctx, esProcessedMap, prefix); err != nil {
 						errCh <- err
 					}
 				case err, ok := <-errCh:

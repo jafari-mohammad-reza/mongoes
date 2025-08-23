@@ -149,7 +149,7 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 					return
 				}
 			}
-			processSleepTimeout := utils.Env("PROCESS_TIMEOUT_SECONDS", "10")
+			processSleepTimeout := utils.Env("PROCESS_TIMEOUT_SECONDS", "2")
 			num, _ := strconv.Atoi(processSleepTimeout)
 			time.Sleep(time.Duration(num) * time.Second)
 		}

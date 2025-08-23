@@ -27,7 +27,7 @@ func main() {
 		fmt.Printf("%s\n", err.Error())
 		os.Exit(1)
 	}
-	db := utils.Env("MONGO_DB", "new-iri")
+	db := utils.Env("MONGO_DB", "test-db")
 	colls, err := mc.Colls(ctx, db)
 	if err != nil {
 		fmt.Printf("failed to get %s collections %s\n", db, err.Error())

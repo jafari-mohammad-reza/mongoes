@@ -55,10 +55,10 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []map[string]a
 		}
 		index := i[0]
 		if index == prefix {
-		}
-		field := i[1]
-		if field != "" {
-			uniqueField = field
+			field := i[1]
+			if field != "" {
+				uniqueField = field
+			}
 		}
 	}
 
@@ -93,12 +93,14 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []map[string]a
 	if err := json.NewDecoder(res.Body).Decode(&bulkRes); err != nil {
 		return fmt.Errorf("decode bulk response: %w", err)
 	}
-	if bulkRes["errors"].(bool) {
-		for _, item := range bulkRes["items"].([]any) {
-			it := item.(map[string]any)
-			idx := it["index"].(map[string]any)
-			if idx["error"] != nil {
-				return fmt.Errorf("failed doc %v: %+v\n", idx["_id"], idx["error"])
+	if bulkRes["errors"] != nil {
+		if bulkRes["errors"].(bool) {
+			for _, item := range bulkRes["items"].([]any) {
+				it := item.(map[string]any)
+				idx := it["index"].(map[string]any)
+				if idx["error"] != nil {
+					return fmt.Errorf("failed doc %v: %+v\n", idx["_id"], idx["error"])
+				}
 			}
 		}
 	}
@@ -110,7 +112,6 @@ func (es *EsClient) IndexProcessed(ctx context.Context, processed []map[string]a
 	if res.IsError() {
 		return fmt.Errorf("bulk indexing error: %s", res.String())
 	}
-
 	log.Printf("Indexed %d docs into %s", len(processed), index)
 	return nil
 }

@@ -62,9 +62,12 @@ func (m *MdClient) loadOffsets(ctx context.Context) error {
 			return fmt.Errorf("failed to read %s: %s", entry.Name(), err.Error())
 		}
 		defer f.Close()
-		scanner := bufio.NewScanner(f)
-		lineCount := 0
 
+		scanner := bufio.NewScanner(f)
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, 10*1024*1024) // 10MB max token size
+
+		lineCount := 0
 		for scanner.Scan() {
 			lineCount++
 		}
@@ -102,6 +105,14 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 		m.collStat[coll] = stat
 	} else {
 		stat = collStat
+	}
+	docCount, err := m.cl.Database(db).Collection(coll).CountDocuments(ctx, bson.D{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get %d doc counts: %s", coll, err.Error())
+	}
+	if docCount == collStat.Offset {
+		fmt.Printf("%s processed count reached max of %d\n", coll, collStat.Offset)
+		return nil, nil, nil
 	}
 	go func() {
 		defer close(processedChan)
@@ -163,7 +174,11 @@ func (m *MdClient) logProcessed(coll string, processed []bson.Raw) error {
 		m.processFiles[coll] = f
 	}
 	for i, pr := range processed {
-		_, err := fmt.Fprintln(file, pr.String())
+		var doc map[string]any
+		if err := bson.Unmarshal(pr, &doc); err != nil {
+			return fmt.Errorf("failed to unmarshal doc: %w", err)
+		}
+		_, err := fmt.Fprintln(file, doc["_id"])
 		if err != nil {
 			return fmt.Errorf("failed to write processed line %d to process file: %s", i, err.Error())
 		}

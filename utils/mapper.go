@@ -74,7 +74,7 @@ func flatten(prefix string, in map[string]any, out map[string]any) {
 	for k, v := range in {
 		key := k
 		if prefix != "" {
-			key = prefix + "." + k
+			key = prefix + "_" + k
 		}
 
 		switch val := v.(type) {

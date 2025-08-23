@@ -4,3 +4,5 @@ es-processed
 vendor
 mongoes
 tmp
+es-mappers
+mappers

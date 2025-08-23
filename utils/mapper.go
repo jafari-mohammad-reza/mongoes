@@ -105,7 +105,6 @@ func (m *Mapper) EsMapper(indic string, processed []map[string]any) ([]map[strin
 	docs := make([]map[string]any, 0, len(processed))
 
 	for _, item := range processed {
-		fmt.Printf("item: %v\n", item)
 		flattened := make(map[string]any)
 		flatten("", item, flattened)
 		mapped := make(map[string]any)

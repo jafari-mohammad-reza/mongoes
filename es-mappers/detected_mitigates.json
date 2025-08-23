@@ -28,7 +28,7 @@
   "message.Distinct Count of Destination Ports Number Used as Attack Targets": "dest_port_count",
   "message.Type of Attack Destination Ports Number": "dest_port_type",
   "message.Distinct Count of Source IP Addresses Used in the Attack": "src_ip_count",
-  "Type of Attack Source IP Addresses": "src_ip_type",
-  "Distinct Count of Source Ports Number Used in the Attack": "src_port_count",
-  "Type of Attack Source Ports Number": "src_port_type"
+  "message.Type of Attack Source IP Addresses": "src_ip_type",
+  "message.Distinct Count of Source Ports Number Used in the Attack": "src_port_count",
+  "message.Type of Attack Source Ports Number": "src_port_type"
 }

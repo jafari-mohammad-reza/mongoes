@@ -73,9 +73,6 @@ func (m *Mapper) ProcessedMapper(coll string, processed []bson.Raw) ([]map[strin
 func flatten(prefix string, in map[string]any, out map[string]any) {
 	for k, v := range in {
 		key := k
-		if prefix != "" {
-			key = prefix + "_" + k
-		}
 
 		switch val := v.(type) {
 		case string:
@@ -83,30 +80,6 @@ func flatten(prefix string, in map[string]any, out map[string]any) {
 		case map[string]any:
 			flatten(key, val, out)
 		default:
-		}
-	}
-}
-
-func FlattenMap(m map[string]any, prefix string, out map[string]any) {
-	for k, v := range m {
-		key := k
-
-		switch val := v.(type) {
-		case map[string]any:
-			FlattenMap(val, key, out)
-		case bson.M:
-			FlattenMap(val, key, out)
-		case []any:
-			for i, arrVal := range val {
-				arrKey := fmt.Sprintf("%s_%d", key, i)
-				if subMap, ok := arrVal.(map[string]any); ok {
-					FlattenMap(subMap, arrKey, out)
-				} else {
-					out[arrKey] = arrVal
-				}
-			}
-		default:
-			out[key] = v
 		}
 	}
 }

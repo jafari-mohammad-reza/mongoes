@@ -68,7 +68,11 @@ func main() {
 			}
 			for {
 				select {
-				case processed := <-prCh:
+				case processed, ok := <-prCh:
+					if !ok {
+						fmt.Printf("Channel closed for collection %s, stopping processing", coll)
+						return
+					}
 					prefix, ok := esColl[coll]
 					if !ok {
 						prefix = coll
@@ -80,7 +84,11 @@ func main() {
 					if err := esc.IndexProcessed(ctx, processedMap, prefix); err != nil {
 						errCh <- err
 					}
-				case err := <-errCh:
+				case err, ok := <-errCh:
+					if !ok {
+						fmt.Printf("Channel closed for collection %s, stopping processing", coll)
+						return
+					}
 					fmt.Printf("failed to get %s changes: %s", coll, err.Error())
 					os.Exit(1)
 				}

@@ -106,14 +106,6 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 	} else {
 		stat = collStat
 	}
-	docCount, err := m.cl.Database(db).Collection(coll).CountDocuments(ctx, bson.D{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get %d doc counts: %s", coll, err.Error())
-	}
-	if docCount == collStat.Offset {
-		fmt.Printf("%s processed count reached max of %d\n", coll, collStat.Offset)
-		return nil, nil, nil
-	}
 	go func() {
 		defer close(processedChan)
 		defer close(errorChan)
@@ -125,7 +117,15 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 				return
 			default:
 			}
-
+			docCount, err := m.cl.Database(db).Collection(coll).CountDocuments(ctx, bson.D{})
+			if err != nil {
+				errorChan <- fmt.Errorf("failed to get %s doc counts: %s", coll, err.Error())
+				return
+			}
+			if docCount == collStat.Offset {
+				fmt.Printf("%s processed count reached max of %d\n", coll, collStat.Offset)
+				return
+			}
 			cur, err := m.cl.Database(db).Collection(coll).Find(ctx, bson.D{}, &options.FindOptions{Sort: bson.M{sortBy: -1}, Skip: &stat.Offset, Limit: &batch})
 			if err != nil {
 				errorChan <- fmt.Errorf("failed to skip %d items from %s in %s database: %s", stat.Offset, coll, db, err.Error())
@@ -149,14 +149,9 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 					return
 				}
 			}
-
-			if len(processed) == 0 {
-				processSleepTimeout := utils.Env("PROCESS_TIMEOUT_SECONDS", "10")
-				num, _ := strconv.Atoi(processSleepTimeout)
-				time.Sleep(time.Duration(num) * time.Second)
-			} else {
-				time.Sleep(time.Second * 2)
-			}
+			processSleepTimeout := utils.Env("PROCESS_TIMEOUT_SECONDS", "10")
+			num, _ := strconv.Atoi(processSleepTimeout)
+			time.Sleep(time.Duration(num) * time.Second)
 		}
 	}()
 

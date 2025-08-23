@@ -8,6 +8,7 @@ import (
 	"mongo-es/utils"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -23,16 +24,19 @@ func main() {
 		fmt.Printf("%s\n", err.Error())
 		os.Exit(1)
 	}
+	fmt.Println("elastic initialized")
 	if err := mc.Init(ctx); err != nil {
 		fmt.Printf("%s\n", err.Error())
 		os.Exit(1)
 	}
+	fmt.Println("mongodb initialized.")
 	db := utils.Env("MONGO_DB", "test-db")
 	colls, err := mc.Colls(ctx, db)
 	if err != nil {
 		fmt.Printf("failed to get %s collections %s\n", db, err.Error())
 		os.Exit(1)
 	}
+	fmt.Printf("colls: %v\n", colls)
 	esColl := make(map[string]string, len(colls)) // mongo collections to elastic index names
 	if utils.Env("ES_COLL", "") != "" {
 		esc := utils.Env("ES_COLL", "")
@@ -61,7 +65,12 @@ func main() {
 			continue
 		}
 		go func() {
-			prCh, errCh, err := mc.WatchColl(ctx, db, coll, "", 500)
+			batchSize, err := strconv.Atoi(utils.Env("BATCH_SIZE", "500"))
+			if err != nil {
+				fmt.Printf("failed to get batch size: %s", err.Error())
+				return
+			}
+			prCh, errCh, err := mc.WatchColl(ctx, db, coll, "", int64(batchSize))
 			if err != nil {
 				fmt.Printf("failed to get %s changes: %s", coll, err.Error())
 				return

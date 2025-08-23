@@ -9,6 +9,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -28,6 +29,7 @@ type MdClient struct {
 	watchChan    chan WatchEvent
 	collStat     map[string]CollStats
 	processFiles map[string]*os.File
+	mu           sync.Mutex
 }
 
 func NewMdClient() *MdClient {
@@ -35,6 +37,7 @@ func NewMdClient() *MdClient {
 		watchChan:    make(chan WatchEvent, 1000),
 		collStat:     make(map[string]CollStats),
 		processFiles: make(map[string]*os.File),
+		mu:           sync.Mutex{},
 	}
 }
 func (m *MdClient) Init(ctx context.Context) error {
@@ -99,10 +102,12 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 
 	collStat, ok := m.collStat[coll]
 	if !ok {
+		m.mu.Lock()
 		stat = CollStats{
 			Offset: 0,
 		}
 		m.collStat[coll] = stat
+		m.mu.Unlock()
 	} else {
 		stat = collStat
 	}
@@ -139,9 +144,11 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 			}
 			cur.Close(ctx)
 
+			m.mu.Lock()
 			stat.Offset += int64(len(processed))
-			processedChan <- processed
 			m.collStat[coll] = stat
+			m.mu.Unlock()
+			processedChan <- processed
 
 			if len(processed) > 0 {
 				if err := m.logProcessed(coll, processed); err != nil {

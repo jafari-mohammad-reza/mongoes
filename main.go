@@ -7,19 +7,18 @@ import (
 	"mongo-es/md"
 	"mongo-es/utils"
 	"os"
-	"slices"
-	"strconv"
-	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	godotenv.Load()
 	ctx := context.Background()
+	cfg, err := utils.NewConf()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 	utils.Prepare()
-	mc := md.NewMdClient()
-	esc := es.NewEsClient()
+	mc := md.NewMdClient(cfg)
+	esc := es.NewEsClient(cfg)
 	if err := esc.Init(); err != nil {
 		fmt.Printf("%s\n", err.Error())
 		os.Exit(1)
@@ -30,47 +29,29 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("mongodb initialized.")
-	db := utils.Env("MONGO_DB", "test-db")
+	db := cfg.Mongo.DB
 	colls, err := mc.Colls(ctx, db)
 	if err != nil {
 		fmt.Printf("failed to get %s collections %s\n", db, err.Error())
 		os.Exit(1)
-	}
-	fmt.Printf("colls: %v\n", colls)
-	esColl := make(map[string]string, len(colls)) // mongo collections to elastic index names
-	if utils.Env("ES_COLL", "") != "" {
-		esc := utils.Env("ES_COLL", "")
-		cns := strings.SplitSeq(esc, ",")
-		for cn := range cns {
-			pair := strings.Split(cn, ":")
-			if len(pair) != 2 {
-				continue
-			}
-			esColl[pair[0]] = pair[1]
-		}
 	}
 	mapper, err := utils.NewMapper()
 	if err != nil {
 		fmt.Printf("failed to create mapper: %s\n", err.Error())
 		os.Exit(1)
 	}
-	selectedColls := utils.Env("SELECTED_COLLS", "*")
-	whiteListedColls := []string{}
-	if selectedColls != "*" {
-		whiteListedColls = strings.Split(selectedColls, ",")
-	}
+
 	for _, coll := range colls {
-		if len(whiteListedColls) > 0 && !slices.Contains(whiteListedColls, coll) {
-			fmt.Printf("ignoring %s as its not white listed\n", coll)
+		if !cfg.Mongo.IsWhiteListed(coll) {
+			fmt.Printf("ignoring %s\n", coll)
 			continue
 		}
 		go func() {
-			batchSize, err := strconv.Atoi(utils.Env("BATCH_SIZE", "500"))
 			if err != nil {
 				fmt.Printf("failed to get batch size: %s", err.Error())
 				return
 			}
-			prCh, errCh, err := mc.WatchColl(ctx, db, coll, "", int64(batchSize))
+			prCh, errCh, err := mc.WatchColl(ctx, db, coll, "")
 			if err != nil {
 				fmt.Printf("failed to get %s changes: %s", coll, err.Error())
 				return
@@ -82,7 +63,7 @@ func main() {
 						fmt.Printf("Channel closed for collection %s, stopping processing", coll)
 						return
 					}
-					prefix, ok := esColl[coll]
+					prefix := cfg.Elastic.GetCollPrefix(coll)
 					if !ok {
 						prefix = coll
 					}

@@ -6,6 +6,7 @@ import (
 )
 
 func Prepare() {
+	// TODO: make this cleaner by saving in single parent dir
 	dirs := []string{
 		"md-processed",
 		"es-processed",
@@ -16,11 +17,4 @@ func Prepare() {
 			os.Exit(1)
 		}
 	}
-}
-func Env(name, df string) string {
-	stored := os.Getenv(name)
-	if stored == "" {
-		return df
-	}
-	return stored
 }

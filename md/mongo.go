@@ -7,7 +7,6 @@ import (
 	"mongo-es/utils"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,6 +25,7 @@ type CollStats struct {
 	Offset int64
 }
 type MdClient struct {
+	cfg          *utils.Conf
 	cl           *mongo.Client
 	watchChan    chan WatchEvent
 	collStat     map[string]CollStats
@@ -33,8 +33,9 @@ type MdClient struct {
 	mu           sync.Mutex
 }
 
-func NewMdClient() *MdClient {
+func NewMdClient(cfg *utils.Conf) *MdClient {
 	return &MdClient{
+		cfg:          cfg,
 		watchChan:    make(chan WatchEvent, 1000),
 		collStat:     make(map[string]CollStats),
 		processFiles: make(map[string]*os.File),
@@ -42,11 +43,11 @@ func NewMdClient() *MdClient {
 	}
 }
 func (m *MdClient) Init(ctx context.Context) error {
-	uri := utils.Env("MONGO_URL", "mongodb://127.0.0.1:27017")
+	url := m.cfg.Mongo.URL
 	md, err := mongo.Connect(ctx, options.Client().
-		ApplyURI(uri))
+		ApplyURI(url))
 	if err != nil {
-		return fmt.Errorf("failed to connect to mongo %s", uri)
+		return fmt.Errorf("failed to connect to mongo %s", url)
 	}
 	m.cl = md
 	if err := m.loadOffsets(ctx); err != nil {
@@ -93,7 +94,7 @@ func (m *MdClient) Destroy(ctx context.Context) error {
 func (m *MdClient) Colls(ctx context.Context, db string) ([]string, error) {
 	return m.cl.Database(db).ListCollectionNames(ctx, bson.D{})
 }
-func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch int64) (chan []bson.Raw, chan error, error) {
+func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string) (chan []bson.Raw, chan error, error) {
 	if sortBy == "" {
 		sortBy = "created_at"
 	}
@@ -134,8 +135,9 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 				return
 			}
 			allowDiskUse := true
-			batchSize := int32(batch)
-			cur, err := targetColl.Find(ctx, bson.D{}, &options.FindOptions{Sort: bson.M{sortBy: -1}, Skip: &stat.Offset, Limit: &batch, BatchSize: &batchSize, AllowDiskUse: &allowDiskUse})
+			batchSize := m.cfg.Mongo.GetCollBatch(coll)
+			limit := int64(batchSize)
+			cur, err := targetColl.Find(ctx, bson.D{}, &options.FindOptions{Sort: bson.M{sortBy: -1}, Skip: &stat.Offset, Limit: &limit, BatchSize: &batchSize, AllowDiskUse: &allowDiskUse})
 			if err != nil {
 				errorChan <- fmt.Errorf("failed to skip %d items from %s in %s database: %s", stat.Offset, coll, db, err.Error())
 				return
@@ -160,9 +162,8 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 					return
 				}
 			}
-			processSleepTimeout := utils.Env("PROCESS_TIMEOUT_SECONDS", "2")
-			num, _ := strconv.Atoi(processSleepTimeout)
-			time.Sleep(time.Duration(num) * time.Second)
+			processSleepTimeout := m.cfg.Mongo.BatchTimeoutSec
+			time.Sleep(time.Duration(processSleepTimeout) * time.Second)
 		}
 	}()
 

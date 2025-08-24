@@ -3,6 +3,7 @@ package es
 import (
 	"context"
 	"log"
+	"mongo-es/utils"
 	"testing"
 	"time"
 
@@ -10,7 +11,11 @@ import (
 )
 
 func TestBulkInsert(t *testing.T) {
-	es := NewEsClient()
+	cfg, err := utils.NewConf()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	es := NewEsClient(cfg)
 	if err := es.Init(); err != nil {
 		t.Fatalf("failed to init es: %v", err)
 	}

@@ -24,7 +24,11 @@ type TestRecord struct {
 }
 
 func TestMdClient(t *testing.T) {
-	md := NewMdClient()
+	cfg, err := utils.NewConf()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	md := NewMdClient(cfg)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	utils.Prepare()
@@ -50,7 +54,7 @@ func TestMdClient(t *testing.T) {
 		}
 	}()
 
-	_, errChan, err := md.WatchColl(ctx, "test-db", "users", "", 100)
+	_, errChan, err := md.WatchColl(ctx, "test-db", "users", "")
 	if err != nil {
 		t.Fatalf("failed watching coll %s\n", err.Error())
 		coll.Drop(ctx)
@@ -75,7 +79,11 @@ func insertTestRecs(t *testing.T, ctx context.Context, coll *mongo.Collection) {
 	}
 }
 func TestColls(t *testing.T) {
-	md := NewMdClient()
+	cfg, err := utils.NewConf()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	md := NewMdClient(cfg)
 	ctx := t.Context()
 	if err := md.Init(ctx); err != nil {
 		t.Fatalf("failed to init md client %s\n", err.Error())

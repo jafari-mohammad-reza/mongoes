@@ -9,7 +9,6 @@ import (
 	"log"
 	"mongo-es/utils"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,19 +17,20 @@ import (
 
 type EsClient struct {
 	client *elastic.Client
+	cfg    *utils.Conf
 }
 
-func NewEsClient() *EsClient {
-	return &EsClient{}
+func NewEsClient(cfg *utils.Conf) *EsClient {
+	return &EsClient{
+		cfg: cfg,
+	}
 }
 
 func (es *EsClient) Init() error {
 	cfg := elastic.Config{
-		Addresses: []string{
-			utils.Env("ELASTIC_ADDR", "http://localhost:9200"),
-		},
-		Username: utils.Env("ELASTIC_USER", ""),
-		Password: utils.Env("ELASTIC_PASSWORD", ""),
+		Addresses: es.cfg.Elastic.Addresses,
+		Username:  es.cfg.Elastic.User,
+		Password:  es.cfg.Elastic.Password,
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 10,
 			TLSClientConfig: &tls.Config{
@@ -46,26 +46,10 @@ func (es *EsClient) Init() error {
 	return nil
 }
 func (es *EsClient) IndexProcessed(ctx context.Context, processed []map[string]any, prefix string) error {
-	suffix := utils.Env("INDIC_INDEXING_PERIOD", "fixed")
-	index := fmt.Sprintf("%s-%s", prefix, suffix)
-	if conv, err := strconv.Atoi(suffix); err == nil {
-		index = fmt.Sprintf("%s-%s", prefix, time.Now().Add(time.Duration(time.Hour*time.Duration(conv))).Format(time.DateOnly))
-	}
-	uniqueField := "_id"
-	unFieldsEnv := utils.Env("PREFIX_UNIQUES", "")
-	for item := range strings.SplitSeq(unFieldsEnv, ",") {
-		i := strings.Split(item, ":")
-		if len(i) != 2 {
-			continue
-		}
-		index := i[0]
-		if index == prefix {
-			field := i[1]
-			if field != "" {
-				uniqueField = field
-			}
-		}
-	}
+	period := es.cfg.Elastic.GetIndicPeriod(prefix)
+	index := fmt.Sprintf("%s-%s", prefix, time.Now().Add(time.Duration(time.Hour*time.Duration(period))).Format(time.DateOnly))
+
+	uniqueField := es.cfg.Elastic.GetUniqueField(prefix)
 
 	var buf bytes.Buffer
 	for _, doc := range processed {

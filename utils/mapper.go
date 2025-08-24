@@ -108,23 +108,16 @@ func (m *Mapper) EsMapper(indic string, processed []map[string]any) ([]map[strin
 		flattened := make(map[string]any)
 		flatten("", item, flattened)
 		mapped := make(map[string]any)
-		if Env("INDIC_FLAT_MAP", "") != "" {
-			indicFlatMapEnv := Env("INDIC_FLAT_MAP", "")
-			for fm := range strings.SplitSeq(indicFlatMapEnv, ",") {
-				parts := strings.Split(fm, ":")
-				ind := parts[0]
-				field := parts[1]
-				if ind == indic {
-					field = strings.ReplaceAll(field, "\"", "")
-					flatmap, ok := toMapSliceLoose(flattened[field])
-					if !ok {
-						continue
-					}
-					for k, v := range flatObjectMap(flatmap) {
-						flattened[fmt.Sprintf("%s.%s", field, k)] = v
-					}
+		for field, _ := range flattened {
+			// Check if type of flattened[field] is []any ([]interface{})
+			if slice, ok := flattened[field].([]interface{}); ok {
+				flatmap, ok := toMapSliceLoose(slice)
+				if !ok {
+					continue
 				}
-
+				for k, v := range flatObjectMap(flatmap) {
+					flattened[fmt.Sprintf("%s.%s", field, k)] = v
+				}
 			}
 		}
 

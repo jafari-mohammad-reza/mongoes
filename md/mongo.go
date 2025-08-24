@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -122,7 +123,8 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 				return
 			default:
 			}
-			docCount, err := m.cl.Database(db).Collection(coll).CountDocuments(ctx, bson.D{})
+			targetColl := m.cl.Database(db).Collection(coll)
+			docCount, err := targetColl.CountDocuments(ctx, bson.D{})
 			if err != nil {
 				errorChan <- fmt.Errorf("failed to get %s doc counts: %s", coll, err.Error())
 				return
@@ -131,7 +133,9 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 				fmt.Printf("%s processed count reached max of %d\n", coll, collStat.Offset)
 				return
 			}
-			cur, err := m.cl.Database(db).Collection(coll).Find(ctx, bson.D{}, &options.FindOptions{Sort: bson.M{sortBy: -1}, Skip: &stat.Offset, Limit: &batch})
+			allowDiskUse := true
+			batchSize := int32(batch)
+			cur, err := targetColl.Find(ctx, bson.D{}, &options.FindOptions{Sort: bson.M{sortBy: -1}, Skip: &stat.Offset, Limit: &batch, BatchSize: &batchSize, AllowDiskUse: &allowDiskUse})
 			if err != nil {
 				errorChan <- fmt.Errorf("failed to skip %d items from %s in %s database: %s", stat.Offset, coll, db, err.Error())
 				return
@@ -144,11 +148,11 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string, batch
 			}
 			cur.Close(ctx)
 
+			atomic.AddInt64(&stat.Offset, int64(len(processed)))
 			m.mu.Lock()
-			stat.Offset += int64(len(processed))
 			m.collStat[coll] = stat
-			m.mu.Unlock()
 			processedChan <- processed
+			m.mu.Unlock()
 
 			if len(processed) > 0 {
 				if err := m.logProcessed(coll, processed); err != nil {

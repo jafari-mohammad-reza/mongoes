@@ -19,8 +19,8 @@ type ElasticConf struct {
 	User         string            `mapstructure:"user"`
 	Password     string            `mapstructure:"password"`
 	UniqueFields map[string]string `mapstructure:"unique_fields"`
-	IndicPeriod  map[string]int    `mapstructure:"unique_fields"`
-	CollPrefix   map[string]string
+	IndicPeriod  map[string]int    `mapstructure:"indic_period"`
+	CollPrefix   map[string]string `mapstructure:"coll_prefix"`
 }
 type MongoConf struct {
 	CollBatch       map[string]int32 `mapstructure:"coll_batch"`
@@ -33,10 +33,34 @@ type MongoConf struct {
 type Mappings struct{}
 
 func newV(name string) (*viper.Viper, error) {
+	mongoDefaultVals := map[string]any{
+		"utl":           "mongodb://localhost:27017",
+		"batch_timeout": 10,
+		"db":            "test",
+		"white_list":    []string{},
+	}
+	elasticDefaultVals := map[string]any{
+		"addresses": []string{
+			"http://localhost:9200",
+		},
+		"unique_fields": make(map[string]string),
+		"indic_period":  make(map[string]int),
+		"coll_prefix":   make(map[string]string),
+	}
 	v := viper.New()
-	v.SetConfigFile(name)
+	v.SetConfigFile(fmt.Sprintf("%s.yaml", name))
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
+	fmt.Printf("name: %v\n", name)
+	switch name {
+	case "config":
+		for k, val := range mongoDefaultVals {
+			v.Set(fmt.Sprintf("mongo.%s", k), val)
+		}
+		for k, val := range elasticDefaultVals {
+			v.Set(fmt.Sprintf("elastic.%s", k), val)
+		}
+	}
 	if err := v.ReadInConfig(); err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.New("config not found")
@@ -58,6 +82,7 @@ func NewConf() (*Conf, error) {
 					BatchTimeoutSec: 10,
 					DB:              "test",
 					CollBatch:       make(map[string]int32),
+					WhiteList:       []string{},
 				},
 				Elastic: ElasticConf{
 					Addresses:    []string{"http://localhost:9200"},

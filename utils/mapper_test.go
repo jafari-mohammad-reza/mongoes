@@ -11,14 +11,12 @@ import (
 
 func TestProcessedMapper(t *testing.T) {
 
+	mappings, err := LoadMappings()
+	if err != nil {
+		t.Fatal(err)
+	}
 	m := &Mapper{
-		Collections: map[string]map[string]any{
-			"users": {
-				"name":          "first_name",
-				"last_name":     "last_name",
-				"stats.country": "user_country",
-			},
-		},
+		mappings: mappings,
 	}
 
 	doc := bson.D{

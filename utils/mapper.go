@@ -1,80 +1,31 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"os"
-	"path/filepath"
 	"reflect"
-	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Mapper struct {
-	Collections map[string]map[string]any
-	Indices     map[string]map[string]any
+	mappings *Mappings
 }
 
 func NewMapper() (*Mapper, error) {
+	mappings, err := LoadMappings()
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("mappings: %v\n", mappings)
 	mp := &Mapper{
-		Collections: make(map[string]map[string]any),
-		Indices:     make(map[string]map[string]any),
+		mappings: mappings,
 	}
-
-	// Load MongoDB mappers
-	if err := mp.loadMappersFromDir("mappers", mp.Collections); err != nil {
-		return nil, fmt.Errorf("failed to load mongo mappers: %w", err)
-	}
-
-	// Load Elasticsearch mappers
-	if err := mp.loadMappersFromDir("es-mappers", mp.Indices); err != nil {
-		return nil, fmt.Errorf("failed to load elastic mappers: %w", err)
-	}
-
 	return mp, nil
 }
 
-func (mp *Mapper) loadMappersFromDir(dirPath string, targetMap map[string]map[string]any) error {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to read directory %s: %w", dirPath, err)
-	}
-
-	for _, entry := range entries {
-		filename := entry.Name()
-
-		if !strings.HasSuffix(filename, ".json") || entry.IsDir() {
-			continue
-		}
-
-		key := strings.TrimSuffix(filename, ".json")
-		filePath := filepath.Join(dirPath, filename)
-
-		fileBytes, err := os.ReadFile(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %w", filePath, err)
-		}
-
-		var rawMapping map[string]any
-		if err := json.Unmarshal(fileBytes, &rawMapping); err != nil {
-			return fmt.Errorf("failed to parse JSON in file %s: %w", filePath, err)
-		}
-
-		flattened := make(map[string]any)
-		flatten("", rawMapping, flattened)
-		targetMap[key] = flattened
-	}
-
-	return nil
-}
-
 func (m *Mapper) ProcessedMapper(coll string, processed []bson.Raw) ([]map[string]any, error) {
-	maps := m.Collections[coll]
+	maps := m.mappings.MongoMappings[coll]
 	docs := []map[string]any{}
 	for _, item := range processed {
 		var doc map[string]any
@@ -97,7 +48,7 @@ func (m *Mapper) ProcessedMapper(coll string, processed []bson.Raw) ([]map[strin
 }
 
 func (m *Mapper) EsMapper(indic string, processed []map[string]any) ([]map[string]any, error) {
-	maps, exists := m.Indices[indic]
+	maps, exists := m.mappings.ElasticMappings[indic]
 	if !exists {
 		return processed, nil
 	}

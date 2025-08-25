@@ -1,0 +1,16 @@
+# config.yaml - matches map[string]map[string]any
+mongo:
+  user:
+    _id: id
+    name: firstName
+    email: userEmail
+  product:
+    _id: productId
+    title: productName
+    price: cost
+
+elastic:
+  user_index:
+    id: _id
+    firstName: name
+    userEmail: email

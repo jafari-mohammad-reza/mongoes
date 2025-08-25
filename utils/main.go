@@ -7,9 +7,10 @@ import (
 
 func Prepare() {
 	// TODO: make this cleaner by saving in single parent dir
+
 	dirs := []string{
-		"md-processed",
-		"es-processed",
+		"processed/md-processed",
+		"processed/es-processed",
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {

@@ -57,12 +57,12 @@ func (m *MdClient) Init(ctx context.Context) error {
 }
 
 func (m *MdClient) loadOffsets(ctx context.Context) error {
-	logDir, err := os.ReadDir("md-processed")
+	logDir, err := os.ReadDir("processed/md-processed")
 	if err != nil {
 		return fmt.Errorf("failed to read md-processed dir %s", err.Error())
 	}
 	for _, entry := range logDir {
-		f, err := os.OpenFile(path.Join("md-processed", entry.Name()), os.O_RDONLY, 0655)
+		f, err := os.OpenFile(path.Join("processed/md-processed", entry.Name()), os.O_RDONLY, 0655)
 		if err != nil {
 			return fmt.Errorf("failed to read %s: %s", entry.Name(), err.Error())
 		}
@@ -173,7 +173,7 @@ func (m *MdClient) WatchColl(ctx context.Context, db, coll, sortBy string) (chan
 func (m *MdClient) logProcessed(coll string, processed []bson.Raw) error {
 	file, ok := m.processFiles[coll]
 	if !ok {
-		f, err := os.OpenFile(path.Join("md-processed", fmt.Sprintf("%s_processed.log", coll)), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0655)
+		f, err := os.OpenFile(path.Join("processed/md-processed", fmt.Sprintf("%s_processed.log", coll)), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0655)
 		if err != nil {
 			return err
 		}

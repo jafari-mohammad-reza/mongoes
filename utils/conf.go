@@ -29,8 +29,10 @@ type MongoConf struct {
 	DB              string           `mapstructure:"db"`
 	WhiteList       []string         `mapstructure:"white_list"`
 }
-
-type Mappings struct{}
+type Mappings struct {
+	MongoMappings   map[string]map[string]any `mapstructure:"mongo"`
+	ElasticMappings map[string]map[string]any `mapstructure:"elastic"`
+}
 
 func newV(name string) (*viper.Viper, error) {
 	mongoDefaultVals := map[string]any{
@@ -51,7 +53,6 @@ func newV(name string) (*viper.Viper, error) {
 	v.SetConfigFile(fmt.Sprintf("%s.yaml", name))
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
-	fmt.Printf("name: %v\n", name)
 	switch name {
 	case "config":
 		for k, val := range mongoDefaultVals {
@@ -139,5 +140,6 @@ func LoadMappings() (*Mappings, error) {
 	if err := v.Unmarshal(&mappings); err != nil {
 		return nil, err
 	}
+
 	return &mappings, nil
 }
